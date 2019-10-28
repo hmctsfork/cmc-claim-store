@@ -15,7 +15,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 )
 @SuppressWarnings({"HideUtilityClassConstructor", "squid:S1118"}) // Spring needs a constructor, its not a utility class
 @EnableFeignClients(basePackages =
-    {   "uk.gov.hmcts.cmc.claimstore",
+    {"uk.gov.hmcts.cmc.claimstore",
         "uk.gov.hmcts.reform.authorisation",
         "uk.gov.hmcts.reform.sendletter"
     })

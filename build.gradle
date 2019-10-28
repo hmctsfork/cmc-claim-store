@@ -257,9 +257,7 @@ task apiTest(type: Test) {
   // disable for IoC perfTest 
 /*  setTestClassesDirs(sourceSets.integrationTest.output.classesDirs)
   setClasspath(sourceSets.integrationTest.runtimeClasspath)
-  doFirst{
-    systemProperty('spring.profiles.active', 'integration-tests')
-  }*/
+*/
 }
 
 task migrateClaims() {
