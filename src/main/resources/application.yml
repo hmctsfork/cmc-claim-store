@@ -3,6 +3,9 @@ server:
   port: 4400
 
 management:
+  health:
+    db:
+      enabled: false
   endpoints:
     web:
       exposure:
@@ -11,9 +14,7 @@ management:
   endpoint:
     health:
       show-details: always
-      group:
-        custom:
-          exclude: db
+
 async:
   max:
     threadPool:
