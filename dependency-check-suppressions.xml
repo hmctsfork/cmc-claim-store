@@ -151,11 +151,4 @@
         <gav regex="true">.*</gav>
         <cve>CVE-2019-16869</cve>
     </suppress>
-    <suppress>
-        <notes><![CDATA[
-			   org.quartz-scheduler/quartz@2.3.1
-			]]></notes>
-        <gav regex="true">.*</gav>
-        <cve>CVE-2019-13990</cve>
-    </suppress>
 </suppressions>
