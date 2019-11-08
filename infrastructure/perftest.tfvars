@@ -6,5 +6,6 @@ db_host = "preprod-data-lb.moneyclaim.reform.hmcts.net"
 capacity = "2"
 async_event_operations_enabled = "true"
 save_claim_state_enabled = "true"
+directions_questionnaire_enabled = "true"
 
 
