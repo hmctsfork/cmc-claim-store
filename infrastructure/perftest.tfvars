@@ -1,5 +1,5 @@
-frontend_url = "https://moneyclaims.perftest.platform.hmcts.net"
-respond_to_claim_url = "https://moneyclaims.perftest.platform.hmcts.net/first-contact/start"
+frontend_url = "https://cmc-citizen-frontend-perftest.service.core-compute-perftest.internal"
+respond_to_claim_url = "https://cmc-citizen-frontend-perftest.service.core-compute-perftest.internal/first-contact/start"
 idam_api_url = "https://idam-api.perftest.platform.hmcts.net"
 dm_url = "http://dm-store-perftest.service.core-compute-perftest.internal"
 db_host = "preprod-data-lb.moneyclaim.reform.hmcts.net"
