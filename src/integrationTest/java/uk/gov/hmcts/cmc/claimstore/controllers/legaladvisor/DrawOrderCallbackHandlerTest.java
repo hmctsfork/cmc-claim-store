@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.junit.Before;
 import org.junit.Test;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MvcResult;
@@ -20,9 +21,11 @@ import uk.gov.hmcts.cmc.claimstore.exceptions.CallbackException;
 import uk.gov.hmcts.cmc.claimstore.exceptions.ForbiddenActionException;
 import uk.gov.hmcts.cmc.claimstore.idam.models.UserDetails;
 import uk.gov.hmcts.cmc.claimstore.services.ccd.callbacks.CallbackType;
+import uk.gov.hmcts.cmc.claimstore.services.ccd.legaladvisor.HearingCourt;
 import uk.gov.hmcts.cmc.claimstore.services.notifications.fixtures.SampleUserDetails;
 import uk.gov.hmcts.cmc.domain.models.Claim;
 import uk.gov.hmcts.cmc.domain.models.ClaimDocument;
+import uk.gov.hmcts.cmc.email.EmailService;
 import uk.gov.hmcts.reform.ccd.client.model.AboutToStartOrSubmitCallbackResponse;
 import uk.gov.hmcts.reform.ccd.client.model.CallbackRequest;
 import uk.gov.hmcts.reform.ccd.client.model.CaseDetails;
@@ -56,6 +59,9 @@ public class DrawOrderCallbackHandlerTest extends BaseMockSpringTest {
     private static final String DOCUMENT_FILE_NAME = "sealed_claim.pdf";
     private static final LocalDateTime DATE = LocalDateTime.parse("2020-11-16T13:15:30");
 
+    @MockBean
+    protected EmailService emailService;
+
     private static final CCDDocument DOCUMENT = CCDDocument
         .builder()
         .documentUrl(DOCUMENT_URL)
@@ -81,8 +87,10 @@ public class DrawOrderCallbackHandlerTest extends BaseMockSpringTest {
 
         UserDetails userDetails = SampleUserDetails.builder().withRoles("caseworker-cmc-legaladvisor").build();
         given(userService.getUserDetails(AUTHORISATION_TOKEN)).willReturn(userDetails);
+        given(directionOrderService.getHearingCourt(any())).willReturn(HearingCourt.builder().build());
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     public void shouldAddDraftDocumentToCaseDocumentsOnEventStart() throws Exception {
         MvcResult mvcResult = makeRequest(CallbackType.ABOUT_TO_SUBMIT.getValue())

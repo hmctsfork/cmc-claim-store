@@ -15,11 +15,13 @@ import uk.gov.hmcts.cmc.domain.models.PaymentStatus;
 import uk.gov.hmcts.cmc.domain.models.ReDetermination;
 import uk.gov.hmcts.cmc.domain.models.ReviewOrder;
 import uk.gov.hmcts.cmc.domain.models.claimantresponse.ClaimantResponse;
+import uk.gov.hmcts.cmc.domain.models.claimantresponse.ResponseRejection;
 import uk.gov.hmcts.cmc.domain.models.offers.MadeBy;
 import uk.gov.hmcts.cmc.domain.models.offers.Settlement;
 import uk.gov.hmcts.cmc.domain.models.orders.DirectionOrder;
 import uk.gov.hmcts.cmc.domain.models.response.DefenceType;
 import uk.gov.hmcts.cmc.domain.models.response.Response;
+import uk.gov.hmcts.cmc.domain.models.response.YesNoOption;
 import uk.gov.hmcts.cmc.domain.models.sampledata.offers.SampleOffer;
 import uk.gov.hmcts.cmc.domain.models.sampledata.offers.SampleSettlement;
 import uk.gov.hmcts.cmc.domain.utils.LocalDateTimeFactory;
@@ -33,16 +35,20 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static java.math.BigDecimal.TEN;
 import static uk.gov.hmcts.cmc.domain.models.ClaimDocumentType.CCJ_REQUEST;
 import static uk.gov.hmcts.cmc.domain.models.ClaimDocumentType.CLAIM_ISSUE_RECEIPT;
 import static uk.gov.hmcts.cmc.domain.models.ClaimDocumentType.DEFENDANT_RESPONSE_RECEIPT;
+import static uk.gov.hmcts.cmc.domain.models.ClaimDocumentType.ORDER_DIRECTIONS;
 import static uk.gov.hmcts.cmc.domain.models.ClaimDocumentType.SEALED_CLAIM;
 import static uk.gov.hmcts.cmc.domain.models.ClaimDocumentType.SETTLEMENT_AGREEMENT;
+import static uk.gov.hmcts.cmc.domain.models.ClaimFeatures.ADMISSIONS;
 import static uk.gov.hmcts.cmc.domain.models.CountyCourtJudgmentType.DEFAULT;
 import static uk.gov.hmcts.cmc.domain.models.PaymentOption.IMMEDIATELY;
 import static uk.gov.hmcts.cmc.domain.models.offers.MadeBy.CLAIMANT;
 import static uk.gov.hmcts.cmc.domain.models.response.YesNoOption.NO;
 import static uk.gov.hmcts.cmc.domain.models.response.YesNoOption.YES;
+import static uk.gov.hmcts.cmc.domain.models.sampledata.SampleHearingLocation.pilotHearingLocation;
 import static uk.gov.hmcts.cmc.domain.models.sampledata.SampleInterest.standardInterestBuilder;
 import static uk.gov.hmcts.cmc.domain.utils.DatesProvider.ISSUE_DATE;
 import static uk.gov.hmcts.cmc.domain.utils.DatesProvider.NOW_IN_LOCAL_ZONE;
@@ -64,6 +70,7 @@ public final class SampleClaim {
     public static final String DEFENDANT_EMAIL_VERIFIED = "defendant@mail.com";
     private static final URI DOCUMENT_URI = URI.create("http://localhost/doc.pdf");
     private static final String OCMC = "OCMC";
+    public static final String LEGAL_ADVISOR_ORDER_PDF = "legal-advisor-order.pdf";
 
     private String submitterId = USER_ID;
     private String letterHolderId = LETTER_HOLDER_ID;
@@ -84,14 +91,14 @@ public final class SampleClaim {
     private String defendantEmail;
     private Settlement settlement = null;
     private LocalDateTime settlementReachedAt = null;
-    private List<String> features = Collections.singletonList("admissions");
+    private List<String> features = Collections.singletonList(ADMISSIONS.getValue());
     private LocalDateTime claimantRespondedAt;
     private ClaimantResponse claimantResponse;
     private LocalDate directionsQuestionnaireDeadline;
     private LocalDate moneyReceivedOn;
     private LocalDateTime reDeterminationRequestedAt;
     private ReDetermination reDetermination = new ReDetermination("I feel defendant can pay", CLAIMANT);
-    private ClaimDocumentCollection claimDocumentCollection = new ClaimDocumentCollection();
+    private final ClaimDocumentCollection claimDocumentCollection = new ClaimDocumentCollection();
     private LocalDate claimantResponseDeadline;
     private ClaimState state = ClaimState.OPEN;
     private ClaimSubmissionOperationIndicators claimSubmissionOperationIndicators
@@ -100,7 +107,8 @@ public final class SampleClaim {
     private ReviewOrder reviewOrder;
     private DirectionOrder directionOrder;
     private ChannelType channel;
-    private LocalDate intentionToProceedDeadline = NOW_IN_LOCAL_ZONE.toLocalDate().plusDays(33);
+    private final LocalDate intentionToProceedDeadline = NOW_IN_LOCAL_ZONE.toLocalDate().plusDays(33);
+    private final YesNoOption offlineJourney = NO;
     private MediationOutcome mediationOutcome;
 
     private SampleClaim() {
@@ -120,6 +128,17 @@ public final class SampleClaim {
                 .withMediation(YES)
                 .build()
             ).withState(ClaimState.OPEN)
+            .build();
+    }
+
+    public static Claim getDefaultWithoutResponse(String defendantEmail) {
+        return builder()
+            .withClaimData(
+                SampleClaimData.builder().withDefendant(
+                    SampleTheirDetails.builder()
+                        .withEmail(defendantEmail).individualDetails())
+                    .build())
+            .withDefendantId(null)
             .build();
     }
 
@@ -307,6 +326,8 @@ public final class SampleClaim {
     }
 
     public static Claim getWithClaimantResponseRejectionForPartAdmissionAndMediation() {
+        SampleClaimantResponse.ClaimantResponseRejection
+            .builder();
         return builder()
             .withClaimData(SampleClaimData.submittedByClaimant())
             .withResponse(
@@ -318,10 +339,15 @@ public final class SampleClaim {
             .withRespondedAt(LocalDateTime.now())
             .withDefendantEmail(DEFENDANT_EMAIL)
             .withClaimantRespondedAt(LocalDateTime.now())
-            .withClaimantResponse(SampleClaimantResponse
-                .ClaimantResponseRejection
-                .builder()
-                .buildRejectionWithDirectionsQuestionnaire())
+            .withClaimantResponse(ResponseRejection.builder()
+                .amountPaid(TEN)
+                .freeMediation(YES)
+                .mediationPhoneNumber("07999999999")
+                .mediationContactPerson("Mediation Contact Person")
+                .reason("Some valid reason")
+                .directionsQuestionnaire(SampleDirectionsQuestionnaire.builder()
+                    .withHearingLocation(pilotHearingLocation).build())
+                .build())
             .build();
     }
 
@@ -468,6 +494,7 @@ public final class SampleClaim {
             .withClaimData(SampleClaimData.submittedByClaimant())
             .withResponse(SampleResponse.FullAdmission.validDefaults())
             .withSettlement(settlement)
+            .withSettlementReachedAt(LocalDateTime.now())
             .build();
     }
 
@@ -549,8 +576,11 @@ public final class SampleClaim {
             intentionToProceedDeadline,
             mediationOutcome,
             null,
+            null,
+            offlineJourney,
+            null,
             null
-        );
+            );
     }
 
     public SampleClaim withSubmitterId(String userId) {
@@ -570,6 +600,11 @@ public final class SampleClaim {
 
     public SampleClaim withClaimId(Long claimId) {
         this.claimId = claimId;
+        return this;
+    }
+
+    public SampleClaim withCcdCaseId(Long ccdCaseId) {
+        this.ccdCaseId = ccdCaseId;
         return this;
     }
 
@@ -699,9 +734,22 @@ public final class SampleClaim {
         return this;
     }
 
+    public SampleClaim withOrderDocument(URI uri) {
+        ClaimDocument claimDocument = ClaimDocument.builder()
+            .documentManagementUrl(uri)
+            .documentName(LEGAL_ADVISOR_ORDER_PDF)
+            .documentType(ORDER_DIRECTIONS)
+            .createdDatetime(LocalDateTimeFactory.nowInLocalZone())
+            .createdBy(OCMC)
+            .build();
+        this.claimDocumentCollection.addClaimDocument(claimDocument);
+        return this;
+    }
+
     public SampleClaim withCCJRequestDocument(URI uri) {
         ClaimDocument claimDocument = ClaimDocument.builder()
             .documentManagementUrl(uri)
+            .documentManagementBinaryUrl(uri)
             .documentName("county-court-judgment-details.pdf")
             .documentType(CCJ_REQUEST)
             .createdDatetime(LocalDateTimeFactory.nowInLocalZone())

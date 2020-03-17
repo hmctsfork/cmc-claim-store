@@ -14,14 +14,17 @@ import uk.gov.hmcts.cmc.ccd.domain.CCDClaimDocumentType;
 import uk.gov.hmcts.cmc.ccd.domain.CCDCollectionElement;
 import uk.gov.hmcts.cmc.ccd.domain.CCDDirectionOrder;
 import uk.gov.hmcts.cmc.ccd.domain.CCDDocument;
-import uk.gov.hmcts.cmc.ccd.domain.legaladvisor.CCDOrderGenerationData;
 import uk.gov.hmcts.cmc.ccd.sample.data.SampleData;
+import uk.gov.hmcts.cmc.claimstore.appinsights.AppInsights;
+import uk.gov.hmcts.cmc.claimstore.appinsights.AppInsightsEvent;
 import uk.gov.hmcts.cmc.claimstore.exceptions.CallbackException;
+import uk.gov.hmcts.cmc.claimstore.services.DirectionOrderService;
 import uk.gov.hmcts.cmc.claimstore.services.ccd.DocAssemblyService;
 import uk.gov.hmcts.cmc.claimstore.services.ccd.callbacks.CallbackParams;
 import uk.gov.hmcts.cmc.claimstore.services.ccd.callbacks.CallbackType;
-import uk.gov.hmcts.cmc.claimstore.services.ccd.legaladvisor.HearingCourtDetailsFinder;
+import uk.gov.hmcts.cmc.claimstore.services.ccd.legaladvisor.HearingCourt;
 import uk.gov.hmcts.cmc.claimstore.services.notifications.legaladvisor.OrderDrawnNotificationService;
+import uk.gov.hmcts.cmc.claimstore.services.pilotcourt.PilotCourtService;
 import uk.gov.hmcts.cmc.claimstore.services.staff.content.legaladvisor.LegalOrderService;
 import uk.gov.hmcts.cmc.claimstore.utils.CaseDetailsConverter;
 import uk.gov.hmcts.cmc.domain.models.Claim;
@@ -44,6 +47,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static uk.gov.hmcts.cmc.ccd.domain.CaseEvent.DRAW_ORDER;
+import static uk.gov.hmcts.cmc.claimstore.appinsights.AppInsights.REFERENCE_NUMBER;
 import static uk.gov.hmcts.cmc.domain.utils.LocalDateTimeFactory.UTC_ZONE;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -55,7 +59,7 @@ public class DrawOrderCallbackHandlerTest {
     private static final String DOCUMENT_BINARY_URL = "http://bla.binary.test";
     private static final String DOCUMENT_FILE_NAME = "sealed_claim.pdf";
 
-    private CaseDetails caseDetails = CaseDetails.builder().id(3L).data(Collections.emptyMap()).build();
+    private final CaseDetails caseDetails = CaseDetails.builder().id(3L).data(Collections.emptyMap()).build();
 
     private static final CCDDocument DOCUMENT = CCDDocument
         .builder()
@@ -82,25 +86,29 @@ public class DrawOrderCallbackHandlerTest {
     @Mock
     private LegalOrderService legalOrderService;
     @Mock
-    private HearingCourtDetailsFinder hearingCourtDetailsFinder;
-    @Mock
     private DocAssemblyService docAssemblyService;
+
+    @Mock
+    private PilotCourtService pilotCourtService;
+
+    @Mock
+    private DirectionOrderService directionOrderService;
 
     private CallbackParams callbackParams;
 
     private CallbackRequest callbackRequest;
 
     private DrawOrderCallbackHandler drawOrderCallbackHandler;
+    @Mock
+    private AppInsights appInsights;
 
     @Before
     public void setUp() {
-        drawOrderCallbackHandler = new DrawOrderCallbackHandler(
-            clock,
-            orderDrawnNotificationService,
-            caseDetailsConverter,
-            legalOrderService,
-            hearingCourtDetailsFinder,
-            docAssemblyService);
+        OrderPostProcessor orderPostProcessor = new OrderPostProcessor(clock, orderDrawnNotificationService,
+            caseDetailsConverter, legalOrderService, appInsights, directionOrderService);
+
+        drawOrderCallbackHandler = new DrawOrderCallbackHandler(orderPostProcessor,
+            caseDetailsConverter, docAssemblyService);
 
         when(clock.instant()).thenReturn(DATE.toInstant(ZoneOffset.UTC));
         when(clock.getZone()).thenReturn(ZoneOffset.UTC);
@@ -116,7 +124,7 @@ public class DrawOrderCallbackHandlerTest {
     @Test
     public void shouldRegeneratesOrderOnBeforeEventStart() {
         CCDCase ccdCase = SampleData.getCCDCitizenCase(Collections.emptyList());
-        ccdCase.setDirectionOrderData(SampleData.getCCDOrderGenerationData());
+        ccdCase = SampleData.addCCDOrderGenerationData(ccdCase);
         when(caseDetailsConverter.extractCCDCase(any(CaseDetails.class))).thenReturn(ccdCase);
 
         CallbackRequest callbackRequest = CallbackRequest
@@ -168,12 +176,18 @@ public class DrawOrderCallbackHandlerTest {
             .build();
 
         CCDCase ccdCase = SampleData.getCCDCitizenCase(Collections.emptyList()).toBuilder()
-            .directionOrderData(CCDOrderGenerationData.builder().draftOrderDoc(DOCUMENT).build())
+            .draftOrderDoc(DOCUMENT)
+            .hearingCourt("MANCHESTER")
+            .hearingCourtName(SampleData.MANCHESTER_CIVIL_JUSTICE_CENTRE_CIVIL_AND_FAMILY_COURTS)
+            .hearingCourtAddress(SampleData.getHearingCourtAddress())
             .directionOrder(CCDDirectionOrder.builder()
                 .hearingCourtName(SampleData.MANCHESTER_CIVIL_JUSTICE_CENTRE_CIVIL_AND_FAMILY_COURTS)
                 .hearingCourtAddress(SampleData.getHearingCourtAddress())
                 .build())
+            .hearingCourt(SampleData.MANCHESTER_CIVIL_JUSTICE_CENTRE_CIVIL_AND_FAMILY_COURTS)
             .build();
+
+        when(directionOrderService.getHearingCourt(any())).thenReturn(HearingCourt.builder().build());
 
         when(caseDetailsConverter.extractCCDCase(any(CaseDetails.class))).thenReturn(ccdCase);
 
@@ -225,7 +239,7 @@ public class DrawOrderCallbackHandlerTest {
                 .build();
 
         CCDCase ccdCase = SampleData.getCCDCitizenCase(Collections.emptyList()).toBuilder()
-            .directionOrderData(CCDOrderGenerationData.builder().draftOrderDoc(DOCUMENT).build())
+            .draftOrderDoc(DOCUMENT)
             .directionOrder(CCDDirectionOrder.builder()
                 .hearingCourtName(SampleData.MANCHESTER_CIVIL_JUSTICE_CENTRE_CIVIL_AND_FAMILY_COURTS)
                 .hearingCourtAddress(SampleData.getHearingCourtAddress())
@@ -240,6 +254,8 @@ public class DrawOrderCallbackHandlerTest {
 
         drawOrderCallbackHandler.handle(callbackParams);
 
+        verify(appInsights)
+            .trackEvent(AppInsightsEvent.DRAW_ORDER, REFERENCE_NUMBER, ccdCase.getPreviousServiceCaseReference());
         verify(orderDrawnNotificationService).notifyDefendant(claim);
         verify(orderDrawnNotificationService).notifyClaimant(claim);
         verify(legalOrderService).print(
