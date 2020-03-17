@@ -43,11 +43,6 @@ data "azurerm_key_vault_secret" "staff_email" {
   vault_uri = "${data.azurerm_key_vault.cmc_key_vault.vault_uri}"
 }
 
-data "azurerm_key_vault_secret" "live_support_email" {
-  name = "live-support-email"
-  vault_uri = "${data.azurerm_key_vault.cmc_key_vault.vault_uri}"
-}
-
 data "azurerm_key_vault_secret" "milo_recipient" {
   name = "milo-recipient"
   vault_uri = "${data.azurerm_key_vault.cmc_key_vault.vault_uri}"
