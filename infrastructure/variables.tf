@@ -103,3 +103,7 @@ variable "common_tags" {
 variable claim_stayed_schedule  {
   default = ""
 }
+
+variable "enable_ase" {
+  default = false
+}
